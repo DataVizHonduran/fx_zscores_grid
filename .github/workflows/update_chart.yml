@@ -11,6 +11,9 @@ jobs:
   update-chart:
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: write
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -34,4 +37,3 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: .
         publish_branch: gh-pages
-        keep_files: false
