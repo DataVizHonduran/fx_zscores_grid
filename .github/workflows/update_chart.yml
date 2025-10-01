@@ -26,7 +26,7 @@ jobs:
     
     - name: Run script to generate HTML
       run: |
-        python generate_chart.py
+        python fx_pairs_zscores_interactive_grid.py
     
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
