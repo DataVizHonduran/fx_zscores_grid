@@ -290,7 +290,9 @@ fig.update_layout(
     height=600,
     width=1400,
     title_text=f"FX Price Ratio Explorer - {lookback} Year Lookback (Solid border = mean reverting, Dotted border = trending)",
-    shapes=shapes
+    shapes=shapes,
+    autosize=True,  # Makes it responsive
+    margin=dict(l=50, r=50, t=100, b=50)  # Tighter margins
 )
 
 fig.update_xaxes(row=1, col=2)
