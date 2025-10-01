@@ -1,0 +1,6 @@
+pandas
+numpy
+plotly
+pandas-datareader
+statsmodels
+arch
