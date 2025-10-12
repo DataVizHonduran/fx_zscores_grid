@@ -113,7 +113,7 @@ def find_cell_coords(pair, x_labels, y_labels):
     except KeyError:
         return None
 
-lookback = 10
+lookback = 4
 df_prices = get_fred_fx(lookback)
 
 window = 100
