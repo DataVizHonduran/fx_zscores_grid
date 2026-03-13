@@ -1,9 +1,11 @@
 import datetime
+import os
+import time
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from pandas_datareader import data
+import requests
 import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller, kpss
 from arch.unitroot import VarianceRatio
@@ -12,6 +14,10 @@ from statsmodels.tools.sm_exceptions import InterpolationWarning
 
 warnings.filterwarnings("ignore", category=InterpolationWarning)
 
+FRED_API_KEY = os.environ.get("FRED_API_KEY")
+if not FRED_API_KEY:
+    raise EnvironmentError("FRED_API_KEY environment variable is not set.")
+
 # get_fred_fx: Fetches FX data from FRED, inverts EUR/GBP/AUD/NZD rates to USD base, returns cleaned DataFrame
 # safe_adf: Performs Augmented Dickey-Fuller test, returns p-value or NaN if test fails
 # safe_kpss: Performs KPSS stationarity test, returns p-value or NaN if test fails
@@ -19,43 +25,66 @@ warnings.filterwarnings("ignore", category=InterpolationWarning)
 # classify_series: Classifies time series as mean reverting, trending, random walk, or insufficient data using statistical tests
 # find_cell_coords: Returns rectangle coordinates for highlighting a pair on the heatmap, or None if not found
 
+def _fetch_fred_series(series_id, start_date, end_date, retries=3):
+    url = "https://api.stlouisfed.org/fred/series/observations"
+    params = {
+        "series_id": series_id,
+        "api_key": FRED_API_KEY,
+        "file_type": "json",
+        "observation_start": start_date.isoformat(),
+        "observation_end": end_date.isoformat(),
+    }
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, params=params, timeout=30)
+            resp.raise_for_status()
+            obs = resp.json()["observations"]
+            values = {o["date"]: float(o["value"]) if o["value"] != "." else np.nan for o in obs}
+            return pd.Series(values, name=series_id, dtype=float)
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = 2 ** attempt
+                print(f"  Retry {attempt + 1}/{retries} for {series_id} after {wait}s ({e})")
+                time.sleep(wait)
+            else:
+                raise
+
 def get_fred_fx(years=10):
-    fx_labels = [
-        "USDNOK", "USDSEK", "USDMXN", "USDBRL", "USDZAR",
-        "USDINR", "USDKRW", "USDTHB", "USDSGD", "USDCNH",
-        "USDJPY", "USDEUR", "USDGBP", "USDCAD", "USDCHF",
-        "USDAUD", "USDNZD",
-    ]
-    
-    # Fetch new data from FRED
     datalist = [
         "DEXNOUS", "DEXSDUS", "DEXMXUS", "DEXBZUS", "DEXSFUS",
         "DEXINUS", "DEXKOUS", "DEXTHUS", "DEXSIUS", "DEXCHUS",
         "DEXJPUS", "DEXUSEU", "DEXUSUK", "DEXCAUS", "DEXSZUS",
         "DEXUSAL", "DEXUSNZ",
     ]
-    
-    end_date = datetime.date.today()
-    print(f"Fetching FX data from FRED for date range ending: {end_date}")
-    start_date = end_date - datetime.timedelta(days=365*years)
-    df = data.DataReader(datalist, 'fred', start_date, end_date)
-    df.columns = [
+    col_names = [
         "USDNOK", "USDSEK", "USDMXN", "USDBRL", "USDZAR",
         "USDINR", "USDKRW", "USDTHB", "USDSGD", "USDCNH",
         "USDJPY", "EURUSD", "GBPUSD", "USDCAD", "USDCHF",
         "AUDUSD", "NZDUSD",
     ]
-    df = df.apply(pd.to_numeric, errors='coerce')
+
+    end_date = datetime.date.today()
+    start_date = end_date - datetime.timedelta(days=365 * years)
+    print(f"Fetching FX data from FRED for date range ending: {end_date}")
+
+    series = []
+    for sid in datalist:
+        print(f"  Fetching {sid}...")
+        s = _fetch_fred_series(sid, start_date, end_date)
+        series.append(s)
+
+    df = pd.concat(series, axis=1)
+    df.columns = col_names
     df.index = pd.to_datetime(df.index)
-    
-    for old, new in [('EURUSD', 'USDEUR'), ('GBPUSD', 'USDGBP'), 
+
+    for old, new in [('EURUSD', 'USDEUR'), ('GBPUSD', 'USDGBP'),
                      ('AUDUSD', 'USDAUD'), ('NZDUSD', 'USDNZD')]:
         if old in df.columns:
             df[new] = 1 / df[old]
             df = df.drop(old, axis=1)
-    
+
     df = df.bfill()
-    
+
     print(f"Successfully loaded FX data: {df.shape}")
     print(df.tail())
     return df

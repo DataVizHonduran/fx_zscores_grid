@@ -28,6 +28,8 @@ jobs:
         pip install -r requirements.txt
     
     - name: Run script to generate HTML
+      env:
+        FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
       run: |
         python fx_pairs_zscores_interactive_grid.py
     
