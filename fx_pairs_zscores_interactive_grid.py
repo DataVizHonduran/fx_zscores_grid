@@ -382,9 +382,14 @@ ratios_json = json.dumps(ratios_js_data)
 # Save as HTML with embedded JavaScript
 html_string = fig.to_html(include_plotlyjs='cdn', div_id='plotly-div')
 
-# Insert the ratios data and click handler before </body>
+last_updated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+update_banner = f'<p style="text-align:center;font-family:sans-serif;font-size:13px;color:#666;margin:4px 0 0 0;">Last updated: {last_updated}</p>'
+
+# Insert update timestamp after the chart title, and ratios data + click handler before </body>
 html_parts = html_string.split('</body>')
-html_with_js = html_parts[0] + f"""
+html_with_js = html_parts[0].replace(
+    '<div id="plotly-div"', update_banner + '<div id="plotly-div"', 1
+) + f"""
 <script>
 window.ratiosData = {ratios_json};
 </script>
